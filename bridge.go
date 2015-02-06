@@ -1,76 +1,44 @@
 package bridge
 
 import (
-	"bufio"
-	"fmt"
-	"os"
 	"os/exec"
-	"strings"
 )
 
-const (
-	netctlConfigsPath = "/etc/netctl/"
-)
-
-func CreateBridge(name, bridgeInterface, description, ipType, ipAddr string,
-	interfacesBindsTo, customOptions []string) error {
-
-	if ipType != "dhcp" && ipType != "static" && ipType != "no" {
-		return fmt.Errorf("Wrong IP type")
-	}
-
-	file, err := os.Create(netctlConfigsPath + name)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	writer := bufio.NewWriter(file)
-
-	fmt.Fprintf(writer, "Description=\"%s\"\n", description)
-	fmt.Fprintln(writer, "Interface=", bridgeInterface)
-	fmt.Fprintln(writer, "Connection=bridge")
-	fmt.Fprintf(writer, "BindsToInterfaces=(%s)\n",
-		strings.Join(interfacesBindsTo, " "))
-	fmt.Fprintln(writer, "IP=", ipType)
-	if ipType == "static" {
-		fmt.Fprintln(writer, "Address=", ipAddr)
-	}
-	for _, option := range customOptions {
-		fmt.Fprintln(writer, option)
-	}
-
-	return writer.Flush()
+func CreateBridge(name string) error {
+	cmd := exec.Command("ip", "link", "add", "name", name, "type", "bridge")
+	return cmd.Run()
 }
 
 func RemoveBridge(name string) error {
-	return os.Remove(netctlConfigsPath + name)
+	cmd := exec.Command("ip", "link", "delete", name, "type", "bridge")
+	return cmd.Run()
 }
 
 func StartBridge(name string) error {
-	cmd := exec.Command("netctl", "start", name)
+	cmd := exec.Command("ip", "link", "set", "dev", name, "up")
 	return cmd.Run()
 }
 
 func StopBridge(name string) error {
-	cmd := exec.Command("netctl", "stop", name)
+	cmd := exec.Command("ip", "link", "set", "dev", name, "down")
 	return cmd.Run()
 }
 
 func IsBridgeExist(name string) bool {
-	_, err := os.Stat(netctlConfigsPath + name)
+	cmd := exec.Command("ip", "link", "show", "dev", name)
+	err := cmd.Run()
 	if err == nil {
 		return true
 	}
 	return false
 }
 
-func AssignIpToBridge(ip, bridgeInterface string) error {
-	cmd := exec.Command("ip", "addr", "add", "dev", bridgeInterface, ip)
+func AssignIpToBridge(ip, bridgeName string) error {
+	cmd := exec.Command("ip", "addr", "add", "dev", bridgeName, ip)
 	return cmd.Run()
 }
 
-func RemoveIpFromBridge(ip, bridgeInterface string) error {
-	cmd := exec.Command("ip", "addr", "del", "dev", bridgeInterface, ip)
+func RemoveIpFromBridge(ip, bridgeName string) error {
+	cmd := exec.Command("ip", "addr", "del", "dev", bridgeName, ip)
 	return cmd.Run()
 }
